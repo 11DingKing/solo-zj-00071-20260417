@@ -1,13 +1,18 @@
-FROM node:16
+FROM node:16-alpine
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+RUN apk update && apk add --no-cache \
     g++ \
     gcc \
-    openjdk-11-jdk \
+    openjdk11 \
     python3 \
-    && rm -rf /var/lib/apt/lists/*
+    bash \
+    coreutils \
+    && rm -rf /var/cache/apk/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk
+ENV PATH="$JAVA_HOME/bin:${PATH}"
 
 COPY package*.json ./
 

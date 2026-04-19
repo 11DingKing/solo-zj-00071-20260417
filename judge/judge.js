@@ -26,16 +26,16 @@ const execute = function (
   if (language === "c") {
     executable = path.join(workDir, "solution");
     compileCmd = `gcc -o "${executable}" "${filename}" 2>&1`;
-    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s "${executable}" 2>&1`;
+    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/env time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s "${executable}" 2>&1`;
   } else if (language === "cpp") {
     executable = path.join(workDir, "solution");
     compileCmd = `g++ -o "${executable}" "${filename}" 2>&1`;
-    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s "${executable}" 2>&1`;
+    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/env time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s "${executable}" 2>&1`;
   } else if (language === "java") {
     compileCmd = `cd "${workDir}" && javac "${filename}" 2>&1`;
-    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s java solution 2>&1`;
+    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/env time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s java solution 2>&1`;
   } else if (language === "py") {
-    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s python3 "${filename}" 2>&1`;
+    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/env time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s python3 "${filename}" 2>&1`;
   }
   
   return { compileCmd, runCmd, executable };
