@@ -5,10 +5,7 @@ const path = require("path");
 const { default: PQueue } = require("p-queue");
 const queue = new PQueue({ concurrency: 1 });
 
-let PATH_INIT = path.join(
-  "C:/Users/meetp/OneDrive/Desktop/projects/Online-judge/judge",
-  "/submissions/"
-);
+let PATH_INIT = path.join("/app", "/submissions/");
 
 const execute = function (
   language,
@@ -16,10 +13,32 @@ const execute = function (
   filename,
   testfileName,
   outputfileName,
-  timeMemoryfileName
+  timeMemoryfileName,
+  workDir
 ) {
-  const codefileName = "solution." + language;
-  return `docker run --rm -v="${filename}":/${codefileName}/ -v="${testfileName}":/testcase.txt/ -v="${outputfileName}":/output.txt/ -v="${timeMemoryfileName}":/timeMemory.txt/ online-judge ${language} output.txt timeMemory.txt ${problem.time} ${problem.memory}`;
+  const timeLimit = problem.time || 5;
+  const memLimit = problem.memory || 256;
+  
+  let compileCmd = "";
+  let runCmd = "";
+  let executable = "";
+  
+  if (language === "c") {
+    executable = path.join(workDir, "solution");
+    compileCmd = `gcc -o "${executable}" "${filename}" 2>&1`;
+    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s "${executable}" 2>&1`;
+  } else if (language === "cpp") {
+    executable = path.join(workDir, "solution");
+    compileCmd = `g++ -o "${executable}" "${filename}" 2>&1`;
+    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s "${executable}" 2>&1`;
+  } else if (language === "java") {
+    compileCmd = `cd "${workDir}" && javac "${filename}" 2>&1`;
+    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s java solution 2>&1`;
+  } else if (language === "py") {
+    runCmd = `cd "${workDir}" && cat "${testfileName}" | /usr/bin/time -f "%e %M" -o "${timeMemoryfileName}" timeout ${timeLimit}s python3 "${filename}" 2>&1`;
+  }
+  
+  return { compileCmd, runCmd, executable };
 };
 
 const test = function (problem, submission, op, callback) {
@@ -74,20 +93,54 @@ const test = function (problem, submission, op, callback) {
             },
             function (err, next) {
               if (err) next(null, err);
-              shell.cd(PATH_INIT);
-              shell.exec(
-                execute(
-                  submission.language,
-                  problem,
-                  filename,
-                  testfileName,
-                  outputfileName,
-                  timeMemoryfileName
-                ),
-                function () {
-                  next(null, null);
-                }
+              
+              const { compileCmd, runCmd } = execute(
+                submission.language,
+                problem,
+                filename,
+                testfileName,
+                outputfileName,
+                timeMemoryfileName,
+                PATH
               );
+              
+              fs.writeFileSync(outputfileName, "");
+              fs.writeFileSync(timeMemoryfileName, "");
+              
+              if (compileCmd) {
+                shell.exec(compileCmd, { silent: true }, function (code, stdout, stderr) {
+                  if (code !== 0) {
+                    fs.writeFileSync(outputfileName, "COMPILATION ERROR\n" + stdout + stderr);
+                    next(null, null);
+                  } else {
+                    shell.exec(runCmd, { silent: true }, function (runCode, runStdout, runStderr) {
+                      const output = runStdout + runStderr;
+                      if (output) {
+                        fs.appendFileSync(outputfileName, output);
+                      }
+                      if (runCode === 124) {
+                        fs.appendFileSync(outputfileName, "\nTLE");
+                      } else if (runCode !== 0 && runCode !== 124) {
+                        fs.appendFileSync(outputfileName, "\nRUNTIME ERROR");
+                      }
+                      next(null, null);
+                    });
+                  }
+                });
+              } else {
+                shell.exec(runCmd, { silent: true }, function (runCode, runStdout, runStderr) {
+                  const output = runStdout + runStderr;
+                  if (output) {
+                    fs.appendFileSync(outputfileName, output);
+                  }
+                  if (runCode === 124) {
+                    fs.appendFileSync(outputfileName, "\nTLE");
+                  } else if (runCode !== 0 && runCode !== 124) {
+                    fs.appendFileSync(outputfileName, "\nRUNTIME ERROR");
+                  }
+                  next(null, null);
+                });
+              }
             },
             function (err, next) {
               if (err) next(null, err);
